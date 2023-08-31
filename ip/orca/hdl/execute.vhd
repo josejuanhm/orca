@@ -73,8 +73,15 @@ entity execute is
 
     --To register file
     to_rf_select : buffer std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+    to_rf_select2 : buffer std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
     to_rf_data   : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
     to_rf_valid  : buffer std_logic;
+    to_rf_valid2 : buffer std_logic;
+
+    fpau_data_out1     : in     std_logic_vector(REGISTER_SIZE-1 downto 0);
+    fpau_data_out2     : in     std_logic_vector(REGISTER_SIZE-1 downto 0);
+    fpau_data_out2_reg : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
+    fpau_enable        : in std_logic;
 
     --Data ORCA-internal memory-mapped master
     lsu_oimm_address       : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
@@ -133,6 +140,11 @@ end entity execute;
 architecture behavioural of execute is
   constant INSTRUCTION32 : std_logic_vector(31 downto 0) := (others => '-');
 
+  alias func3           : std_logic_vector(2 downto 0) is to_execute_instruction(INSTR_FUNC3'range);
+  alias func7_low       : std_logic_vector(2 downto 0) is to_execute_instruction(27 downto 25);
+  alias func7_fpau_low  : std_logic_vector(1 downto 0) is to_execute_instruction(29 downto 28);
+  alias func7_fpau_high : std_logic_vector(1 downto 0) is to_execute_instruction(31 downto 30);
+
   alias opcode    : std_logic_vector(6 downto 0) is to_execute_instruction(INSTR_OPCODE'range);
   alias rd_select : std_logic_vector(REGISTER_NAME_SIZE-1 downto 0) is
     to_execute_instruction(REGISTER_RD'range);
@@ -157,7 +169,7 @@ architecture behavioural of execute is
   alias next_rs3_select : std_logic_vector(REGISTER_NAME_SIZE-1 downto 0) is
     to_execute_next_instruction(REGISTER_RD'range);
 
-  type fwd_mux_t is (ALU_FWD, NO_FWD);
+  type fwd_mux_t is (ALU_FWD, FPAU_FWD, NO_FWD);
   signal rs1_mux : fwd_mux_t;
   signal rs2_mux : fwd_mux_t;
   signal rs3_mux : fwd_mux_t;
@@ -191,6 +203,9 @@ architecture behavioural of execute is
   signal vcp_select           : std_logic;
   signal to_vcp_valid         : std_logic;
 
+  signal fpau_data_enable  : std_logic;
+  signal from_fpau_illegal : std_logic;
+
   signal new_instret : std_logic;
 
   signal from_opcode_illegal : std_logic;
@@ -212,10 +227,12 @@ architecture behavioural of execute is
   signal syscall_to_pc_correction_data  : unsigned(REGISTER_SIZE-1 downto 0);
 
   signal from_writeback_ready : std_logic;
-  signal to_rf_mux            : std_logic_vector(1 downto 0);
+  signal to_rf_mux            : std_logic_vector(2 downto 0);
   signal vcp_writeback_select : std_logic;
 
   signal from_branch_misaligned : std_logic;
+
+  signal fpau_enable_delay : std_logic;
 begin
   --Decode instruction; could get pushed back to decode stage
   process (opcode) is
@@ -290,9 +307,10 @@ begin
                                                     ((not vcp_select) or vcp_ready)));
 
 
+  from_fpau_illegal <= '0' when (func7_low = "000" and func7_fpau_low /= "00" and func7_fpau_high /= "00") else '1';
 
   illegal_instruction <= to_execute_valid and from_writeback_ready and (from_opcode_illegal or
-                                                                        (alu_select and from_alu_illegal) or
+                                                                        (alu_select and from_alu_illegal and from_fpau_illegal) or
                                                                         (branch_select and from_branch_illegal) or
                                                                         (lsu_select and from_lsu_illegal) or
                                                                         (syscall_select and from_syscall_illegal) or
@@ -313,9 +331,13 @@ begin
   --
   -----------------------------------------------------------------------------
   rs1_data <= from_alu_data when rs1_mux = ALU_FWD else
+              fpau_data_out1 when rs1_mux = FPAU_FWD else
               to_execute_rs1_data;
+              
   rs2_data <= from_alu_data when rs2_mux = ALU_FWD else
+              fpau_data_out1 when rs2_mux = FPAU_FWD else
               to_execute_rs2_data;
+
   rs3_data <= from_alu_data when rs3_mux = ALU_FWD else
               to_execute_rs3_data;
 
@@ -330,12 +352,13 @@ begin
   process(clk)
   begin
     if rising_edge(clk) then
+      fpau_enable_delay <= fpau_enable;
       if from_writeback_ready = '1' then
         rs1_mux <= NO_FWD;
         rs2_mux <= NO_FWD;
         rs3_mux <= NO_FWD;
       end if;
-      if to_alu_valid = '1' and from_alu_ready = '1' then
+      if to_alu_valid = '1' and from_alu_ready = '1' and fpau_enable_delay = '0' then
         if rd_select /= REGISTER_ZERO then
           if rd_select = next_rs1_select then
             rs1_mux <= ALU_FWD;
@@ -347,6 +370,18 @@ begin
             rs3_mux <= ALU_FWD;
           end if;
         end if;
+      elsif to_alu_valid = '1' and from_alu_ready = '1' and fpau_enable_delay = '1' then
+        if rd_select /= REGISTER_ZERO then
+          if rd_select = next_rs1_select then
+            rs1_mux <= FPAU_FWD;
+          end if;
+          if rd_select = next_rs2_select then
+            rs2_mux <= FPAU_FWD;
+          end if;
+          if rd_select = next_rs3_select then
+            rs3_mux <= FPAU_FWD;
+          end if;
+        end if; 
       end if;
     end if;
   end process;
@@ -601,34 +636,44 @@ begin
     if rising_edge(clk) then
       if from_writeback_ready = '1' then
         to_rf_select <= rd_select;
+        to_rf_select2 <= rs1_select;
         if rd_select = REGISTER_ZERO then
           to_rf_select_writeable <= '0';
         else
           to_rf_select_writeable <= '1';
         end if;
+        if (func3 = "010" and opcode = ALU_OP and rs1_select /= REGISTER_ZERO and to_execute_valid = '1') then
+          fpau_data_enable <= '1';
+        else
+          fpau_data_enable <= '0';
+        end if;
       end if;
     end if;
   end process;
 
-  to_rf_mux <= "00" when from_syscall_valid = '1' else
-               "01" when load_in_progress = '1' else
-               "10" when from_branch_valid = '1' else
-               "11";
+  to_rf_mux <= "000" when from_syscall_valid = '1' else
+               "001" when load_in_progress = '1' else
+               "010" when from_branch_valid = '1' else
+               "011" when fpau_data_enable = '1' else
+               "111";
 
   with to_rf_mux select
     to_rf_data <=
-    from_syscall_data when "00",
-    from_lsu_data     when "01",
-    from_branch_data  when "10",
+    from_syscall_data when "000",
+    from_lsu_data     when "001",
+    from_branch_data  when "010",
+    fpau_data_out1    when "011",
     from_alu_data     when others;
+  
+  fpau_data_out2_reg <= fpau_data_out2;
 
   to_rf_valid <= to_rf_select_writeable and (from_syscall_valid or
                                              from_lsu_valid or
                                              from_branch_valid or
+                                             fpau_data_enable or
                                              (from_alu_valid and (not vcp_writeback_select)));
 
-
-
+  to_rf_valid2 <= fpau_data_enable;
   -------------------------------------------------------------------------------
   -- Simulation assertions and debug
   -------------------------------------------------------------------------------

@@ -24,6 +24,10 @@ entity decode is
     to_rf_data   : in std_logic_vector(REGISTER_SIZE-1 downto 0);
     to_rf_valid  : in std_logic;
 
+    to_rf_select2        : in std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+    to_rf_data_fpau_out2 : in std_logic_vector(REGISTER_SIZE-1 downto 0);
+    to_rf_valid2         : in std_logic;
+
     to_decode_instruction              : in     std_logic_vector(INSTRUCTION_SIZE(vcp_type'(DISABLED))-1 downto 0);
     to_decode_program_counter          : in     unsigned(REGISTER_SIZE-1 downto 0);
     to_decode_predicted_pc             : in     unsigned(REGISTER_SIZE-1 downto 0);
@@ -33,6 +37,11 @@ entity decode is
 
     quash_decode : in  std_logic;
     decode_idle  : out std_logic;
+
+    --FPAU outputs
+    fpau_data_out1 : out std_logic_vector(REGISTER_SIZE-1 downto 0);
+    fpau_data_out2 : out std_logic_vector(REGISTER_SIZE-1 downto 0);
+    fpau_enable_to_execute : out std_logic;
 
     from_decode_rs1_data         : out std_logic_vector(REGISTER_SIZE-1 downto 0);
     from_decode_rs2_data         : out std_logic_vector(REGISTER_SIZE-1 downto 0);
@@ -49,6 +58,9 @@ entity decode is
 end;
 
 architecture rtl of decode is
+  alias func3  : std_logic_vector(2 downto 0) is to_decode_instruction(INSTR_FUNC3'range);
+  alias opcode : std_logic_vector(6 downto 0) is to_decode_instruction(INSTR_OPCODE'range);
+
   signal from_decode_incomplete_instruction_signal : std_logic;
   signal from_decode_instruction_signal            : std_logic_vector(from_decode_instruction'range);
   signal from_decode_valid_signal                  : std_logic;
@@ -92,6 +104,15 @@ architecture rtl of decode is
   signal wb_data   : std_logic_vector(REGISTER_SIZE-1 downto 0);
   signal wb_enable : std_logic;
 
+  signal wb2_select         : std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+  signal fpau_data_out2_int : std_logic_vector(REGISTER_SIZE -1 downto 0);
+  signal wb2_enable         : std_logic;
+
+  signal rs1_data_to_fpau : std_logic_vector(REGISTER_SIZE-1 downto 0);
+  signal rs2_data_to_fpau : std_logic_vector(REGISTER_SIZE-1 downto 0);
+  signal rs3_data_to_fpau : std_logic_vector(REGISTER_SIZE-1 downto 0);
+  signal fpau_enable      : std_logic;
+
   signal to_decode_sixty_four_bit_instruction : std_logic;
   signal from_stage1_incomplete_instruction   : std_logic;
 begin
@@ -114,21 +135,47 @@ begin
       wb_select  => wb_select,
       wb_data    => wb_data,
       wb_enable  => wb_enable,
+      wb2_select  => wb2_select,
+      fpau_data_out2 => fpau_data_out2_int,
+      wb2_enable  => wb2_enable,
+      rs1_data_fpau => rs1_data_to_fpau,
+      rs2_data_fpau => rs2_data_to_fpau,
+      rs3_data_fpau => rs3_data_to_fpau,
       rs1_data   => rs1_data,
       rs2_data   => rs2_data,
       rs3_data   => rs3_data
       );
+
+  fpau_enable <= '1' when (func3 = "010" and opcode = ALU_OP and to_decode_valid = '1') else '0';
+  fpau : fpau_top
+    port map (
+      CLK   => clk,
+      en    => fpau_enable,
+      op    => to_decode_instruction(31 downto 28),
+      a0    => rs3_data_to_fpau,
+      a1    => rs1_data_to_fpau,
+      acc   => rs2_data_to_fpau,
+      omega => rs2_data_to_fpau,
+      rsum  => fpau_data_out1,
+      out2  => fpau_data_out2
+    );
 
   -- This is to handle Microsemi board's inability to initialize RAM to zero on startup.
   reg_rst_en : if FAMILY = "MICROSEMI" generate
     wb_select <= to_rf_select when reset = '0' else (others => '0');
     wb_data   <= to_rf_data   when reset = '0' else (others => '0');
     wb_enable <= to_rf_valid  when reset = '0' else '1';
+    wb2_select <= to_rf_select2 when reset = '0' else (others => '0');
+    fpau_data_out2_int <= to_rf_data_fpau_out2 when reset = '0' else (others => '0');
+    wb2_enable <= to_rf_valid2  when reset = '0' else '1';
   end generate reg_rst_en;
   reg_rst_nen : if FAMILY /= "MICROSEMI" generate
     wb_select <= to_rf_select;
     wb_data   <= to_rf_data;
     wb_enable <= to_rf_valid;
+    wb2_select <= to_rf_select2;
+    fpau_data_out2_int <= to_rf_data_fpau_out2;
+    wb2_enable <= to_rf_valid2;
   end generate reg_rst_nen;
 
   ------------------------------------------------------------------------------
@@ -244,6 +291,8 @@ begin
           from_decode_predicted_pc       <= from_stage1_predicted_pc;
           from_decode_instruction_signal <= from_stage1_instruction;
           from_decode_valid_signal       <= from_stage1_valid;
+
+          fpau_enable_to_execute <= fpau_enable;
         end if;
 
         --Bypass registers already read out of register file

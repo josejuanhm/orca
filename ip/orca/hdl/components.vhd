@@ -774,7 +774,7 @@ package rv_components is
       ifetch_oimm_readdatavalid : in     std_logic;
 
       --Data ORCA-internal memory-mapped master
-      lsu_oimm_address       : out    std_logic_vector(REGISTER_SIZE-1 downto 0);
+      lsu_oimm_address       : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
       lsu_oimm_byteenable    : out    std_logic_vector((REGISTER_SIZE/8)-1 downto 0);
       lsu_oimm_requestvalid  : buffer std_logic;
       lsu_oimm_readnotwrite  : buffer std_logic;
@@ -828,6 +828,10 @@ package rv_components is
       to_rf_data   : in std_logic_vector(REGISTER_SIZE-1 downto 0);
       to_rf_valid  : in std_logic;
 
+      to_rf_select2        : in std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+      to_rf_data_fpau_out2 : in std_logic_vector(REGISTER_SIZE-1 downto 0);
+      to_rf_valid2         : in std_logic;
+
       to_decode_instruction              : in     std_logic_vector(INSTRUCTION_SIZE(vcp_type'(DISABLED))-1 downto 0);
       to_decode_program_counter          : in     unsigned(REGISTER_SIZE-1 downto 0);
       to_decode_predicted_pc             : in     unsigned(REGISTER_SIZE-1 downto 0);
@@ -837,6 +841,10 @@ package rv_components is
 
       quash_decode : in  std_logic;
       decode_idle  : out std_logic;
+
+      fpau_data_out1 : out std_logic_vector(REGISTER_SIZE-1 downto 0);
+      fpau_data_out2 : out std_logic_vector(REGISTER_SIZE-1 downto 0);
+      fpau_enable_to_execute : out std_logic;
 
       from_decode_rs1_data         : out std_logic_vector(REGISTER_SIZE-1 downto 0);
       from_decode_rs2_data         : out std_logic_vector(REGISTER_SIZE-1 downto 0);
@@ -914,11 +922,18 @@ package rv_components is
 
       --To register file
       to_rf_select : buffer std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+      to_rf_select2 : buffer std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
       to_rf_data   : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
       to_rf_valid  : buffer std_logic;
+      to_rf_valid2 : buffer std_logic;
+
+      fpau_data_out1     : in     std_logic_vector(REGISTER_SIZE-1 downto 0);
+      fpau_data_out2     : in     std_logic_vector(REGISTER_SIZE-1 downto 0);
+      fpau_data_out2_reg : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
+      fpau_enable        : in     std_logic;
 
       --Data ORCA-internal memory-mapped master
-      lsu_oimm_address       : out    std_logic_vector(REGISTER_SIZE-1 downto 0);
+      lsu_oimm_address       : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
       lsu_oimm_byteenable    : out    std_logic_vector((REGISTER_SIZE/8)-1 downto 0);
       lsu_oimm_requestvalid  : buffer std_logic;
       lsu_oimm_readnotwrite  : buffer std_logic;
@@ -1043,6 +1058,20 @@ package rv_components is
       );
   end component arithmetic_unit;
 
+  component fpau_top is
+    port (
+      CLK   : in  std_logic;
+      en    : in  std_logic;
+      op    : in  std_logic_vector(3 downto 0);
+      a0    : in  std_logic_vector(31 downto 0);
+      a1    : in  std_logic_vector(31 downto 0);
+      acc   : in  std_logic_vector(31 downto 0);
+      omega : in  std_logic_vector(31 downto 0);
+      rsum  : out std_logic_vector(31 downto 0);
+      out2  : out std_logic_vector(31 downto 0)
+    );
+  end component fpau_top;
+
   component branch_unit is
     generic (
       REGISTER_SIZE       : positive range 32 to 32;
@@ -1106,7 +1135,7 @@ package rv_components is
       from_lsu_valid : out std_logic;
 
       --ORCA-internal memory-mapped master
-      oimm_address       : out    std_logic_vector(REGISTER_SIZE-1 downto 0);
+      oimm_address       : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
       oimm_byteenable    : out    std_logic_vector((REGISTER_SIZE/8)-1 downto 0);
       oimm_requestvalid  : buffer std_logic;
       oimm_readnotwrite  : buffer std_logic;
@@ -1132,6 +1161,14 @@ package rv_components is
       wb_select  : in std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
       wb_data    : in std_logic_vector(REGISTER_SIZE-1 downto 0);
       wb_enable  : in std_logic;
+      
+      wb2_select : in std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+      fpau_data_out2 : in std_logic_vector(REGISTER_SIZE -1 downto 0);
+      wb2_enable : in std_logic;
+
+      rs1_data_fpau : out std_logic_vector(REGISTER_SIZE -1 downto 0);
+      rs2_data_fpau : out std_logic_vector(REGISTER_SIZE -1 downto 0);
+      rs3_data_fpau : out std_logic_vector(REGISTER_SIZE -1 downto 0);
 
       rs1_data : out std_logic_vector(REGISTER_SIZE-1 downto 0);
       rs2_data : out std_logic_vector(REGISTER_SIZE-1 downto 0);

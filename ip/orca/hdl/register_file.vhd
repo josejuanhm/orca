@@ -19,6 +19,14 @@ entity register_file is
     wb_select  : in std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
     wb_data    : in std_logic_vector(REGISTER_SIZE-1 downto 0);
     wb_enable  : in std_logic;
+    
+    wb2_select : in std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+    fpau_data_out2 : in std_logic_vector(REGISTER_SIZE -1 downto 0);
+    wb2_enable : in std_logic;
+
+    rs1_data_fpau : out std_logic_vector(REGISTER_SIZE -1 downto 0);
+    rs2_data_fpau : out std_logic_vector(REGISTER_SIZE -1 downto 0);
+    rs3_data_fpau : out std_logic_vector(REGISTER_SIZE -1 downto 0);
 
     rs1_data : out std_logic_vector(REGISTER_SIZE-1 downto 0);
     rs2_data : out std_logic_vector(REGISTER_SIZE-1 downto 0);
@@ -29,6 +37,14 @@ end;
 architecture rtl of register_file is
   type register_vector is array(31 downto 0) of std_logic_vector(REGISTER_SIZE-1 downto 0);
   signal registers : register_vector := (others => (others => '0'));
+  shared variable registers_variable : register_vector := (others => (others => '0'));
+
+  signal writeback_select : std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+  signal writeback_data   : std_logic_vector(REGISTER_SIZE-1 downto 0);
+  signal writeback_enable : std_logic;
+  signal wb2_select_delay : std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+  signal wb2_enable_delay : std_logic;
+  signal wb_data_delay    : std_logic_vector(REGISTER_SIZE-1 downto 0);
 
 --These aliases are useful during simulation of software.
   alias ra  : std_logic_vector(REGISTER_SIZE-1 downto 0) is registers(to_integer(unsigned(REGISTER_RA)));
@@ -83,9 +99,15 @@ begin
         if wb_enable = '1' then
           registers(to_integer(unsigned(wb_select))) <= wb_data;
         end if;
+        if wb2_enable = '1' then
+          registers(to_integer(unsigned(wb2_select))) <= fpau_data_out2;
+        end if;
       end if;
     end process;
 
+    rs1_data_fpau <= registers(to_integer(unsigned(rs1_select)));
+    rs2_data_fpau <= registers(to_integer(unsigned(rs2_select)));
+    rs3_data_fpau <= registers(to_integer(unsigned(rs3_select)));
 
     --read during write logic
     rs1_data <= wb_data_latched when read_during_write1 = '1' else out1;
@@ -113,18 +135,44 @@ begin
   end generate bypass_gen;
 
   write_first_gen : if WRITE_FIRST_SMALL_RAMS generate
+    -- process to delay FPAU writeback signals in order to write 2nd output in subsequent clock cycle (goal is to keep RAM inference):
     process (clk) is
-      variable registers_variable : register_vector := (others => (others => '0'));
     begin
       if rising_edge(clk) then
-        if wb_enable = '1' then
-          registers_variable(to_integer(unsigned(wb_select))) := wb_data;
+        --wb2_select_delay <= wb2_select;
+        --wb2_enable_delay <= wb2_enable;
+        --wb_data_delay    <= fpau_data_out2;
+        wb2_select_delay <= wb_select;
+        wb2_enable_delay <= wb2_enable;
+        wb_data_delay    <= wb_data;
+      end if;
+    end process;
+    --writeback_select <= wb2_select_delay when wb2_enable_delay = '1' else wb_select;
+    --writeback_data   <= wb_data_delay when wb2_enable_delay = '1' else wb_data;
+    --writeback_enable <= wb_enable or wb2_enable_delay;
+    writeback_select <= wb2_select_delay when wb2_enable_delay = '1' else
+                        wb2_select when wb2_enable = '1' else 
+                        wb_select;
+    writeback_data   <= wb_data_delay when wb2_enable_delay = '1' else
+                        fpau_data_out2 when wb2_enable = '1' else
+                        wb_data;
+    writeback_enable <= wb_enable or wb2_enable_delay;
+
+    process (clk, rs1_select, rs2_select, rs3_select) is
+    begin
+      if rising_edge(clk) then
+        if writeback_enable = '1' then
+          registers_variable(to_integer(unsigned(writeback_select))) := writeback_data;
         end if;
         rs1_data <= registers_variable(to_integer(unsigned(rs1_select)));
         rs2_data <= registers_variable(to_integer(unsigned(rs2_select)));
         rs3_data <= registers_variable(to_integer(unsigned(rs3_select)));
       end if;
+      rs1_data_fpau <= registers_variable(to_integer(unsigned(rs1_select)));
+      rs2_data_fpau <= registers_variable(to_integer(unsigned(rs2_select)));
+      rs3_data_fpau <= registers_variable(to_integer(unsigned(rs3_select)));
     end process;
+
     process (clk) is
     begin
       if rising_edge(clk) then
@@ -132,6 +180,9 @@ begin
         --duplicates the register_file variable
         if wb_enable = '1' then
           registers(to_integer(unsigned(wb_select))) <= wb_data;
+        end if;
+        if wb2_enable = '1' then
+          registers(to_integer(unsigned(wb2_select))) <= fpau_data_out2;
         end if;
       end if;
     end process;

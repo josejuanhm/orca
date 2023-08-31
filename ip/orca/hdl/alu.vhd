@@ -40,7 +40,7 @@ entity arithmetic_unit is
 end entity arithmetic_unit;
 
 architecture rtl of arithmetic_unit is
-  constant SHIFTER_USE_MULTIPLIER : boolean := MULTIPLY_ENABLE;
+  constant SHIFTER_USE_MULTIPLIER : boolean := false; --MULTIPLY_ENABLE
 
   alias func3  : std_logic_vector(2 downto 0) is instruction(INSTR_FUNC3'range);
   alias func7  : std_logic_vector(6 downto 0) is instruction(INSTR_FUNC7'range);

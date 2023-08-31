@@ -34,7 +34,7 @@ entity load_store_unit is
     from_lsu_valid : out std_logic;
 
     --ORCA-internal memory-mapped master
-    oimm_address       : out    std_logic_vector(REGISTER_SIZE-1 downto 0);
+    oimm_address       : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
     oimm_byteenable    : out    std_logic_vector((REGISTER_SIZE/8)-1 downto 0);
     oimm_requestvalid  : buffer std_logic;
     oimm_readnotwrite  : buffer std_logic;

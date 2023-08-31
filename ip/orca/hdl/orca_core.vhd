@@ -68,7 +68,7 @@ entity orca_core is
     ifetch_oimm_readdatavalid : in     std_logic;
 
     --Data ORCA-internal memory-mapped master
-    lsu_oimm_address       : out    std_logic_vector(REGISTER_SIZE-1 downto 0);
+    lsu_oimm_address       : buffer std_logic_vector(REGISTER_SIZE-1 downto 0);
     lsu_oimm_byteenable    : out    std_logic_vector((REGISTER_SIZE/8)-1 downto 0);
     lsu_oimm_requestvalid  : buffer std_logic;
     lsu_oimm_readnotwrite  : buffer std_logic;
@@ -141,10 +141,17 @@ architecture rtl of orca_core is
   signal from_decode_valid                  : std_logic;
   signal execute_to_decode_ready            : std_logic;
 
+  signal fpau_data_out1_DecToEx : std_logic_vector(REGISTER_SIZE-1 downto 0);
+  signal fpau_data_out2_DecToEx : std_logic_vector(REGISTER_SIZE-1 downto 0);
+  signal fpau_data_out2_ExToDec : std_logic_vector(REGISTER_SIZE-1 downto 0);
+  signal execute_to_rf_select2  : std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
+  signal fpau_enable_DecToEx    :std_logic;
+  
   signal to_execute_valid     : std_logic;
   signal execute_to_rf_select : std_logic_vector(REGISTER_NAME_SIZE-1 downto 0);
   signal execute_to_rf_data   : std_logic_vector(REGISTER_SIZE-1 downto 0);
   signal execute_to_rf_valid  : std_logic;
+  signal execute_to_rf_valid2 : std_logic;
 
   signal from_execute_pause_ifetch : std_logic;
   signal to_ifetch_pause_ifetch    : std_logic;
@@ -206,6 +213,10 @@ begin
       to_rf_data   => execute_to_rf_data,
       to_rf_valid  => execute_to_rf_valid,
 
+      to_rf_select2        => execute_to_rf_select2,
+      to_rf_data_fpau_out2 => fpau_data_out2_ExToDec,
+      to_rf_valid2         => execute_to_rf_valid2,
+
       to_decode_program_counter          => ifetch_to_decode_program_counter,
       to_decode_predicted_pc             => ifetch_to_decode_predicted_pc,
       to_decode_instruction              => ifetch_to_decode_instruction,
@@ -215,6 +226,10 @@ begin
 
       quash_decode => to_pc_correction_valid,
       decode_idle  => decode_idle,
+
+      fpau_data_out1 => fpau_data_out1_DecToEx,
+      fpau_data_out2 => fpau_data_out2_DecToEx,
+      fpau_enable_to_execute => fpau_enable_DecToEx,
 
       from_decode_rs1_data         => decode_to_execute_rs1_data,
       from_decode_rs2_data         => decode_to_execute_rs2_data,
@@ -290,8 +305,15 @@ begin
       from_pc_correction_ready     => from_pc_correction_ready,
 
       to_rf_select => execute_to_rf_select,
+      to_rf_select2 => execute_to_rf_select2,
       to_rf_data   => execute_to_rf_data,
       to_rf_valid  => execute_to_rf_valid,
+      to_rf_valid2  => execute_to_rf_valid2,
+
+      fpau_data_out1     => fpau_data_out1_DecToEx,
+      fpau_data_out2     => fpau_data_out2_DecToEx,
+      fpau_data_out2_reg => fpau_data_out2_ExToDec,
+      fpau_enable        => fpau_enable_DecToEx,
 
       lsu_oimm_address       => lsu_oimm_address,
       lsu_oimm_byteenable    => lsu_oimm_byteenable,
