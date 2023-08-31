@@ -24,7 +24,7 @@ COE_FILE = test.coe
 
 PROJ_FILE=$(PROJ_DIR)/$(PROJ_NAME).xpr
 BD_FILE=$(PROJ_DIR)/$(PROJ_NAME).srcs/sources_1/bd/$(BD_NAME)/$(BD_NAME).bd
-HWDEF_FILE=$(PROJ_DIR)/$(PROJ_NAME).srcs/sources_1/bd/$(BD_NAME)/synth/$(BD_NAME).hwdef
+HWDEF_FILE=$(PROJ_DIR)/$(PROJ_NAME).srcs/sources_1/bd/$(BD_NAME)/hdl/$(BD_NAME).hwdef
 SYNTH_DCP=$(PROJ_DIR)/$(PROJ_NAME).runs/synth_1/$(BD_NAME)_wrapper.dcp
 IMPL_BIT=$(PROJ_DIR)/$(PROJ_NAME).runs/impl_1/$(BD_NAME)_wrapper.bit
 ORCA_SRCS=$(wildcard ../../ip/orca/hdl/*.vhd) ../../ip/orca/component.xml
@@ -244,7 +244,8 @@ ifndef TEST
 sim:
 	$(error Define TEST variable before running make sim ($(SW_DIR)/$$(TEST).coe will be used))
 else #ifndef TEST
-sim: $(BD_FILE) $(SW_DIR)/$(TEST).coe
+#sim: $(BD_FILE) $(SW_DIR)/$(TEST).coe
+sim:
 	ln -sf $(SW_DIR)/$(TEST).coe $(COE_FILE)
 	vivado -nolog -nojournal $(PROJ_FILE) -source simulate.tcl &
 endif #else #ifndef TEST
@@ -276,7 +277,8 @@ ifndef TEST
 run:
 	$(error Define TEST variable before running make run ($(SW_DIR)/$$(TEST).ihex will be used))
 else #ifndef TEST
-run: $(SW_DIR)/$(TEST).ihex FORCE
+#run: $(SW_DIR)/$(TEST).ihex FORCE
+run:
 	python ../../tools/orca_pgm.py $(SW_DIR)/$(TEST).ihex  --family=xilinx --reset_address=$(JTAG_RESET_BASE_ADDRESS)
 endif #else #ifndef TEST
 

@@ -22,6 +22,7 @@ proc start_sim { {run_time 0} } {
     catch { launch_simulation }
 
     set reset_time 1000
+    set reset_cpu_time 2000
 
     reset_waves
     
@@ -30,6 +31,7 @@ proc start_sim { {run_time 0} } {
 
     #Reset from the PS doesn't get generated automatically
     add_force /[set orca_system_name]_wrapper/[set orca_system_name]_i/processing_system7_0_FCLK_RESET0_N 0 0us 1 $reset_time
+    add_force /[set orca_system_name]_wrapper/[set orca_system_name]_i/clock_peripheral_reset_cpu 1 0us 0 $reset_cpu_time
     
     #Was getting simulation errors from this port;
     #should not be actually used in simulation so forcing the clock to 0
@@ -41,12 +43,12 @@ proc start_sim { {run_time 0} } {
     #Turn on UART bypass module
     add_force /[set orca_system_name]_wrapper/[set orca_system_name]_i/xlconstant_bypass_ps7_uart_dout   1 0us
 
-    set run_from_idram [expr [get_property CONFIG.RESET_VECTOR [get_bd_cells /orca]] == 0xc0000000]
+    set run_from_idram [expr [get_property CONFIG.RESET_VECTOR [get_bd_cells /orca]] == 0x00000000]
     if { $run_from_idram } {
         #Run until reset is about to be removed then set up BRAMs
         run [expr $reset_time]
 
-        set coe_file [open "software/test.coe" r]
+        set coe_file [open "test.coe" r]
         set coe_data [read $coe_file]
         close $coe_file
 
@@ -60,22 +62,22 @@ proc start_sim { {run_time 0} } {
                 set byte0 ""
                 append byte0 [string index $word 6]
                 append byte0 [string index $word 7]
-                set_value "/[set orca_system_name]_wrapper/[set orca_system_name]_i/idram/U0/ram/\\idram_gen(0)\\/tdp_ram/ram[$i]" -radix hex $byte0 
+                set_value "/[set orca_system_name]_wrapper/[set orca_system_name]_i/idram_0/U0/ram/\\idram_gen(0)\\/tdp_ram/ram[$i]" -radix hex $byte0 
                 set byte1 ""
                 append byte1 [string index $word 4]
                 append byte1 [string index $word 5]
-                set_value "/[set orca_system_name]_wrapper/[set orca_system_name]_i/idram/U0/ram/\\idram_gen(1)\\/tdp_ram/ram[$i]" -radix hex $byte1
+                set_value "/[set orca_system_name]_wrapper/[set orca_system_name]_i/idram_0/U0/ram/\\idram_gen(1)\\/tdp_ram/ram[$i]" -radix hex $byte1
                 set byte2 ""
                 append byte2 [string index $word 2]
                 append byte2 [string index $word 3]
-                set_value "/[set orca_system_name]_wrapper/[set orca_system_name]_i/idram/U0/ram/\\idram_gen(2)\\/tdp_ram/ram[$i]" -radix hex $byte2 
+                set_value "/[set orca_system_name]_wrapper/[set orca_system_name]_i/idram_0/U0/ram/\\idram_gen(2)\\/tdp_ram/ram[$i]" -radix hex $byte2 
                 set byte3 "" 
                 append byte3 [string index $word 0]
                 append byte3 [string index $word 1]
-                set_value "/[set orca_system_name]_wrapper/[set orca_system_name]_i/idram/U0/ram/\\idram_gen(3)\\/tdp_ram/ram[$i]" -radix hex $byte3 
+                set_value "/[set orca_system_name]_wrapper/[set orca_system_name]_i/idram_0/U0/ram/\\idram_gen(3)\\/tdp_ram/ram[$i]" -radix hex $byte3 
                 set i [expr {$i + 1}]
             }
         }
     }
-    run $run_time
+    #run 19500 us
 }
