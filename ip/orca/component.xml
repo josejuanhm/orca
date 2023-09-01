@@ -6090,15 +6090,15 @@
     <spirit:fileSet>
       <spirit:name>xilinx_anylanguagesynthesis_view_fileset</spirit:name>
       <spirit:file>
-        <spirit:name>../../../fpau/fpau_top.sv</spirit:name>
+        <spirit:name>../../../../rtl/fpau_top.sv</spirit:name>
         <spirit:fileType>systemVerilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>../../../fpau/reduction_solinas_12_10_8.sv</spirit:name>
+        <spirit:name>../../../../rtl/reduction_solinas_12_10_8.sv</spirit:name>
         <spirit:fileType>systemVerilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>../../../fpau/reduction_solinas_23_13.sv</spirit:name>
+        <spirit:name>../../../../rtl/reduction_solinas_23_13.sv</spirit:name>
         <spirit:fileType>systemVerilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
@@ -6198,15 +6198,15 @@
     <spirit:fileSet>
       <spirit:name>xilinx_anylanguagebehavioralsimulation_view_fileset</spirit:name>
       <spirit:file>
-        <spirit:name>../../../fpau/fpau_top.sv</spirit:name>
+        <spirit:name>../../../../rtl/fpau_top.sv</spirit:name>
         <spirit:fileType>systemVerilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>../../../fpau/reduction_solinas_12_10_8.sv</spirit:name>
+        <spirit:name>../../../../rtl/reduction_solinas_12_10_8.sv</spirit:name>
         <spirit:fileType>systemVerilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>../../../fpau/reduction_solinas_23_13.sv</spirit:name>
+        <spirit:name>../../../../rtl/reduction_solinas_23_13.sv</spirit:name>
         <spirit:fileType>systemVerilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
