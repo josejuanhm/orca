@@ -1,5 +1,9 @@
 -include config.mk
 
+ifdef SIM_BUILD
+BD_NAME ?= orca_system
+BD_EXTENSION ?= _cached_idram
+else
 #Select cached system by default if it exists
 ifndef BD_NAME
 ifneq ($(wildcard orca_system_cached.tcl), )
@@ -10,6 +14,7 @@ BD_NAME ?= orca_system
 BD_EXTENSION ?= _tcm
 endif #else #ifeq ($(wildcard orca_system_cached.tcl), )
 endif #ifndef BD_NAME
+endif #SIM_BUILD
 
 
 PROJECT_TCL ?= project.tcl
@@ -36,6 +41,8 @@ PGM_TCL=pgm.tcl
 
 .PHONY: all
 all: $(OUT_BIT) resource_utilization.rpt link.ld orca_defines.h
+
+	@echo $(value BD_EXTENSION)
 
 VIVADO_SOURCE=vivado -notrace -nojournal -nolog -mode batch -source
 
