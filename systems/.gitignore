@@ -25,7 +25,6 @@ init_*.imem
 *.smsg
 *.rpt*
 *.summary
-orca_defines.h
 *.hwh
 PLL*_INFO.txt
 /*.test/
